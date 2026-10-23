@@ -22,7 +22,12 @@ class Validator(unittest.TestCase):
         return parse_one(sql, read=self.dialect, **kwargs)
 
     def validate_identity(
-        self, sql, write_sql=None, pretty=False, check_command_warning=False, identify=False
+        self,
+        sql,
+        write_sql=None,
+        pretty=False,
+        check_command_warning=False,
+        identify=False,
     ):
         if check_command_warning:
             with self.assertLogs(parser_logger) as cm:
@@ -32,7 +37,8 @@ class Validator(unittest.TestCase):
             expression = self.parse_one(sql)
 
         self.assertEqual(
-            write_sql or sql, expression.sql(dialect=self.dialect, pretty=pretty, identify=identify)
+            write_sql or sql,
+            expression.sql(dialect=self.dialect, pretty=pretty, identify=identify),
         )
         return expression
 
@@ -67,7 +73,9 @@ class Validator(unittest.TestCase):
             with self.subTest(f"{sql} -> {write_dialect}"):
                 if write_sql is UnsupportedError:
                     with self.assertRaises(UnsupportedError):
-                        expression.sql(write_dialect, unsupported_level=ErrorLevel.RAISE)
+                        expression.sql(
+                            write_dialect, unsupported_level=ErrorLevel.RAISE
+                        )
                 else:
                     self.assertEqual(
                         expression.sql(
@@ -113,7 +121,9 @@ class TestDialect(Validator):
         lowercase_mysql = Dialect.get_or_raise("mysql,normalization_strategy=lowercase")
         self.assertEqual(lowercase_mysql.normalization_strategy, "LOWERCASE")
 
-        lowercase_mysql = Dialect.get_or_raise("mysql, normalization_strategy = lowercase")
+        lowercase_mysql = Dialect.get_or_raise(
+            "mysql, normalization_strategy = lowercase"
+        )
         self.assertEqual(lowercase_mysql.normalization_strategy.value, "LOWERCASE")
 
         with self.assertRaises(AttributeError) as cm:
@@ -124,7 +134,9 @@ class TestDialect(Validator):
         with self.assertRaises(ValueError) as cm:
             Dialect.get_or_raise("myqsl")
 
-        self.assertEqual(str(cm.exception), "Unknown dialect 'myqsl'. Did you mean mysql?")
+        self.assertEqual(
+            str(cm.exception), "Unknown dialect 'myqsl'. Did you mean mysql?"
+        )
 
         with self.assertRaises(ValueError) as cm:
             Dialect.get_or_raise("asdfjasodiufjsd")
@@ -140,7 +152,9 @@ class TestDialect(Validator):
         class MyDialect(Dialect):
             SUPPORTED_SETTINGS = {"s1", "s2", "s3", "s4", "s5"}
 
-        bool_settings = Dialect.get_or_raise("mydialect, s1=TruE, s2=1, s3=FaLse, s4=0, s5=nonbool")
+        bool_settings = Dialect.get_or_raise(
+            "mydialect, s1=TruE, s2=1, s3=FaLse, s4=0, s5=nonbool"
+        )
         self.assertEqual(
             bool_settings.settings,
             {"s1": True, "s2": True, "s3": False, "s4": False, "s5": "nonbool"},
@@ -450,7 +464,9 @@ class TestDialect(Validator):
             },
         )
         self.validate_all("CAST(a AS TINYINT)", write={"oracle": "CAST(a AS SMALLINT)"})
-        self.validate_all("CAST(a AS SMALLINT)", write={"oracle": "CAST(a AS SMALLINT)"})
+        self.validate_all(
+            "CAST(a AS SMALLINT)", write={"oracle": "CAST(a AS SMALLINT)"}
+        )
         self.validate_all("CAST(a AS BIGINT)", write={"oracle": "CAST(a AS INT)"})
         self.validate_all("CAST(a AS INT)", write={"oracle": "CAST(a AS INT)"})
         self.validate_all(
@@ -770,6 +786,7 @@ class TestDialect(Validator):
                 "mysql": "CAST('2020-01-01 12:13:14.123456+00:00' AS DATETIME(6))",
                 "trino": "CAST('2020-01-01 12:13:14.123456+00:00' AS TIMESTAMP(6))",
                 "presto": "CAST('2020-01-01 12:13:14.123456+00:00' AS TIMESTAMP)",
+                "clickhouse": "CAST('2020-01-01 12:13:14' AS DateTime64(6))",
             },
         )
         self.validate_all(
@@ -814,7 +831,7 @@ class TestDialect(Validator):
                 "snowflake": "CAST(col AS TIMESTAMPTZ)",
                 "spark": "CAST(col AS TIMESTAMP)",
                 "trino": "CAST(col AS TIMESTAMP WITH TIME ZONE)",
-                "clickhouse": "CAST(col AS DateTime64(6, 'America/Los_Angeles'))",
+                "clickhouse": "toDateTime(col, 'America/Los_Angeles')",
                 "drill": "CAST(col AS TIMESTAMP)",
                 "hive": "CAST(col AS TIMESTAMP)",
                 "presto": "CAST(col AS TIMESTAMP WITH TIME ZONE)",
@@ -836,6 +853,7 @@ class TestDialect(Validator):
             "TIME_TO_STR(x, '%Y-%m-%d')",
             write={
                 "bigquery": "FORMAT_DATE('%Y-%m-%d', x)",
+                "clickhouse": "TO_CHAR(x, 'yyyy-MM-dd')",
                 "drill": "TO_CHAR(x, 'yyyy-MM-dd')",
                 "duckdb": "STRFTIME(x, '%Y-%m-%d')",
                 "hive": "DATE_FORMAT(x, 'yyyy-MM-dd')",
@@ -852,6 +870,7 @@ class TestDialect(Validator):
             write={
                 "redshift": "TO_CHAR(a, 'YYYY-MM-DD HH24:MI:SS.US')",
                 "tsql": "FORMAT(a, 'yyyy-MM-dd HH:mm:ss.ffffff')",
+                "clickhouse": "TIME_TO_STR(a, '%Y-%m-%d %H:%M:%S.%f')",
             },
         )
         self.validate_all(
@@ -928,6 +947,7 @@ class TestDialect(Validator):
                 "presto": "FROM_UNIXTIME(x)",
                 "starrocks": "FROM_UNIXTIME(x)",
                 "doris": "FROM_UNIXTIME(x)",
+                "clickhouse": "toDateTime(x)",
             },
         )
         self.validate_all(
@@ -954,6 +974,7 @@ class TestDialect(Validator):
                 "duckdb": "CAST(STRFTIME(x, '%Y%m%d') AS INT)",
                 "hive": "CAST(DATE_FORMAT(x, 'yyyyMMdd') AS INT)",
                 "presto": "CAST(DATE_FORMAT(x, '%Y%m%d') AS INT)",
+                "clickhouse": "CAST(TO_DATE(x, 'yyyyMMdd') AS INT)",
             },
         )
         self.validate_all(
@@ -963,6 +984,7 @@ class TestDialect(Validator):
                 "duckdb": "CAST(STRPTIME(CAST(x AS TEXT), '%Y%m%d') AS DATE)",
                 "hive": "TO_DATE(CAST(x AS STRING), 'yyyyMMdd')",
                 "presto": "CAST(DATE_PARSE(CAST(x AS VARCHAR), '%Y%m%d') AS DATE)",
+                "clickhouse": "CAST('2023-02-01' AS Nullable(DateTime))",
             },
         )
         self.validate_all(
@@ -1232,7 +1254,7 @@ class TestDialect(Validator):
                 "postgres": "DATE_TRUNC('DAY', x, 'UTC')",
                 "snowflake": "DATE_TRUNC('DAY', x)",
                 "databricks": "DATE_TRUNC('DAY', x)",
-                "clickhouse": "DATE_TRUNC('DAY', x, 'UTC')",
+                "clickhouse": "TO_UTC_TIMESTAMP(DATE_TRUNC('DAY', x))",
             },
         )
 
@@ -1411,11 +1433,15 @@ class TestDialect(Validator):
         )
 
         order_by_all_sql = "SELECT * FROM t ORDER BY ALL"
-        self.validate_identity(order_by_all_sql).find(exp.Ordered).this.assert_is(exp.Column)
+        self.validate_identity(order_by_all_sql).find(exp.Ordered).this.assert_is(
+            exp.Column
+        )
 
         for dialect in ("duckdb", "spark", "databricks"):
             with self.subTest(f"Testing ORDER BY ALL in {dialect}"):
-                parse_one(order_by_all_sql, read=dialect).find(exp.Ordered).this.assert_is(exp.Var)
+                parse_one(order_by_all_sql, read=dialect).find(
+                    exp.Ordered
+                ).this.assert_is(exp.Var)
 
     def test_json(self):
         self.validate_all(
@@ -1590,10 +1616,14 @@ class TestDialect(Validator):
         )
 
         for dialect in ("duckdb", "starrocks"):
-            with self.subTest(f"Generating json extraction with digit-prefixed key ({dialect})"):
+            with self.subTest(
+                f"Generating json extraction with digit-prefixed key ({dialect})"
+            ):
                 self.assertEqual(
-                    parse_one("""select '{"0": "v"}' -> '0'""", read=dialect).sql(dialect=dialect),
-                    """SELECT '{"0": "v"}' -> '0'""",
+                    parse_one("""select '{"0": "v"}' -> '0'""", read=dialect).sql(
+                        dialect=dialect
+                    ),
+                    """SELECT '{"0": "v"}' ->> '0'""",
                 )
 
     def test_cross_join(self):
@@ -1809,7 +1839,9 @@ class TestDialect(Validator):
         )
 
     def test_operators(self):
-        self.validate_identity("some.column LIKE 'foo' || another.column || 'bar' || LOWER(x)")
+        self.validate_identity(
+            "some.column LIKE 'foo' || another.column || 'bar' || LOWER(x)"
+        )
         self.validate_identity("some.column LIKE 'foo' + another.column + 'bar'")
 
         self.validate_all("LIKE(x, 'z')", write={"": "'z' LIKE x"})
@@ -2299,7 +2331,9 @@ class TestDialect(Validator):
         )
 
     def test_typeddiv(self):
-        typed_div = exp.Div(this=exp.column("a"), expression=exp.column("b"), typed=True)
+        typed_div = exp.Div(
+            this=exp.column("a"), expression=exp.column("b"), typed=True
+        )
         div = exp.Div(this=exp.column("a"), expression=exp.column("b"))
         typed_div_dialect = "presto"
         div_dialect = "hive"
@@ -2324,7 +2358,9 @@ class TestDialect(Validator):
             (div, (INT, FLOAT), typed_div_dialect, "a / b"),
             (div, (INT, FLOAT), div_dialect, "a / b"),
         ]:
-            with self.subTest(f"{expression.__class__.__name__} {types} {dialect} -> {expected}"):
+            with self.subTest(
+                f"{expression.__class__.__name__} {types} {dialect} -> {expected}"
+            ):
                 expression = expression.copy()
                 expression.left.type = types[0]
                 expression.right.type = types[1]
@@ -2342,7 +2378,9 @@ class TestDialect(Validator):
             (div, safe_div_dialect, "a / b"),
             (div, div_dialect, "a / b"),
         ]:
-            with self.subTest(f"{expression.__class__.__name__} {dialect} -> {expected}"):
+            with self.subTest(
+                f"{expression.__class__.__name__} {dialect} -> {expected}"
+            ):
                 self.assertEqual(expected, expression.sql(dialect=dialect))
 
         self.assertEqual(
@@ -2814,7 +2852,8 @@ SELECT
         self.validate_identity("COUNT_IF(DISTINCT cond)")
 
         self.validate_all(
-            "SELECT COUNT_IF(cond) FILTER", write={"": "SELECT COUNT_IF(cond) AS FILTER"}
+            "SELECT COUNT_IF(cond) FILTER",
+            write={"": "SELECT COUNT_IF(cond) AS FILTER"},
         )
         self.validate_all(
             "SELECT COUNT_IF(col % 2 = 0) FROM foo",
@@ -3038,8 +3077,12 @@ FROM subquery2""",
         with_large_nulls = "postgres"
 
         sql = "SELECT * FROM t ORDER BY c"
-        sql_nulls_last = "SELECT * FROM t ORDER BY CASE WHEN c IS NULL THEN 1 ELSE 0 END, c"
-        sql_nulls_first = "SELECT * FROM t ORDER BY CASE WHEN c IS NULL THEN 1 ELSE 0 END DESC, c"
+        sql_nulls_last = (
+            "SELECT * FROM t ORDER BY CASE WHEN c IS NULL THEN 1 ELSE 0 END, c"
+        )
+        sql_nulls_first = (
+            "SELECT * FROM t ORDER BY CASE WHEN c IS NULL THEN 1 ELSE 0 END DESC, c"
+        )
 
         for read_dialect, desc, nulls_first, expected_sql in (
             (with_last_nulls, False, None, sql_nulls_last),
@@ -3072,7 +3115,9 @@ FROM subquery2""",
                 )
 
                 expected_sql = f"{expected_sql}{sort_order}"
-                expression = parse_one(f"{sql}{sort_order}{null_order}", read=read_dialect)
+                expression = parse_one(
+                    f"{sql}{sort_order}{null_order}", read=read_dialect
+                )
 
                 self.assertEqual(expression.sql(dialect="mysql"), expected_sql)
                 self.assertEqual(expression.sql(dialect="tsql"), expected_sql)
@@ -3157,7 +3202,9 @@ FROM subquery2""",
         self.validate_identity(
             "CREATE SEQUENCE seq START WITH 1 NO MINVALUE NO MAXVALUE CYCLE NO CACHE"
         )
-        self.validate_identity("CREATE OR REPLACE TEMPORARY SEQUENCE seq INCREMENT BY 1 NO CYCLE")
+        self.validate_identity(
+            "CREATE OR REPLACE TEMPORARY SEQUENCE seq INCREMENT BY 1 NO CYCLE"
+        )
         self.validate_identity(
             "CREATE OR REPLACE SEQUENCE IF NOT EXISTS seq COMMENT='test comment' ORDER"
         )
@@ -3318,7 +3365,9 @@ FROM subquery2""",
                     },
                 )
 
-        self.assertIsInstance(parse_one("NORMALIZE('str', NFD)").args.get("form"), exp.Var)
+        self.assertIsInstance(
+            parse_one("NORMALIZE('str', NFD)").args.get("form"), exp.Var
+        )
 
     def test_coalesce(self):
         """
@@ -3425,7 +3474,9 @@ FROM subquery2""",
 
     def test_escaped_identifier_delimiter(self):
         for dialect in ("databricks", "hive", "mysql", "spark2", "spark"):
-            with self.subTest(f"Testing escaped backtick in identifier name for {dialect}"):
+            with self.subTest(
+                f"Testing escaped backtick in identifier name for {dialect}"
+            ):
                 self.validate_all(
                     'SELECT 1 AS "x`"',
                     read={
@@ -3447,7 +3498,9 @@ FROM subquery2""",
             "snowflake",
             "sqlite",
         ):
-            with self.subTest(f"Testing escaped double-quote in identifier name for {dialect}"):
+            with self.subTest(
+                f"Testing escaped double-quote in identifier name for {dialect}"
+            ):
                 self.validate_all(
                     'SELECT 1 AS "x"""',
                     read={
@@ -3459,7 +3512,9 @@ FROM subquery2""",
                 )
 
         for dialect in ("clickhouse", "sqlite"):
-            with self.subTest(f"Testing escaped backtick in identifier name for {dialect}"):
+            with self.subTest(
+                f"Testing escaped backtick in identifier name for {dialect}"
+            ):
                 self.validate_all(
                     'SELECT 1 AS "x`"',
                     read={
@@ -3569,14 +3624,19 @@ FROM subquery2""",
                 "spark",
                 "redshift",
             ):
-                with self.subTest(f"Testing hex string -> INTEGER evaluation for {read_dialect}"):
+                with self.subTest(
+                    f"Testing hex string -> INTEGER evaluation for {read_dialect}"
+                ):
                     self.assertEqual(
-                        parse_one("SELECT 0xCC", read=read_dialect).sql(write_dialect), "SELECT 204"
+                        parse_one("SELECT 0xCC", read=read_dialect).sql(write_dialect),
+                        "SELECT 204",
                     )
 
             for other_integer_dialects in integer_dialects:
                 self.assertEqual(
-                    parse_one("SELECT 0xCC", read=read_dialect).sql(other_integer_dialects),
+                    parse_one("SELECT 0xCC", read=read_dialect).sql(
+                        other_integer_dialects
+                    ),
                     "SELECT 0xCC",
                 )
 
